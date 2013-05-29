@@ -12,7 +12,9 @@
 #
 
 ifneq ($(MACHINE),)
+ifneq ($(CONFIG_ARCH_VEXPRESS_GEM5),y)
 include $(srctree)/$(MACHINE)/Makefile.boot
+endif
 endif
 include $(srctree)/arch/arm/boot/dts/Makefile
 

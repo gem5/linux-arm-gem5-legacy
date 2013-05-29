@@ -237,7 +237,9 @@ else
 MACHINE  :=
 endif
 ifeq ($(CONFIG_ARCH_MULTIPLATFORM),y)
+ifneq ($(CONFIG_ARCH_VEXPRESS_GEM5),y)
 MACHINE  :=
+endif
 endif
 
 machdirs := $(patsubst %,arch/arm/mach-%/,$(machine-y))
@@ -250,6 +252,15 @@ else
 KBUILD_CPPFLAGS += $(patsubst %,-I$(srctree)/%include,$(machdirs) $(platdirs))
 endif
 endif
+
+ifeq ($(CONFIG_ARCH_VEXPRESS_GEM5),y)
+ifeq ($(KBUILD_SRC),)
+KBUILD_CPPFLAGS += $(patsubst %,-I%include,$(machdirs) $(platdirs))
+else
+KBUILD_CPPFLAGS += $(patsubst %,-I$(srctree)/%include,$(machdirs) $(platdirs))
+endif
+endif
+
 
 export	TEXT_OFFSET GZFLAGS MMUEXT
 

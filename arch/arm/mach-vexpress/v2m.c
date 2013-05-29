@@ -46,6 +46,30 @@
 #define V2M_PA_CS3	0x4c000000
 #define V2M_PA_CS7	0x10000000
 
+#define SPACE_CODE_BIT_LOCN 24
+#define SPACE_CODE_WIDTH 0x3
+
+u32 dt_vexpress_pci_cfg_base = 0;
+u32 dt_vexpress_pci_cfg_size;
+u32 dt_vexpress_pci_cfg_limit;
+u32 dt_vexpress_pci_cfg_vbase;
+u32 dt_vexpress_pci_mem_vbase;
+u32 dt_vexpress_pci_memp_vbase;
+u32 dt_vexpress_pci_io_vbase;
+u32 dt_vexpress_pci_mem_base;
+u32 dt_vexpress_pci_memp_base;
+u32 dt_vexpress_pci_io_base;
+u32 dt_vexpress_pci_mem_size;
+u32 dt_vexpress_pci_memp_size;
+u32 dt_vexpress_pci_io_size;
+u32 dt_vexpress_pci_mem_limit;
+u32 dt_vexpress_pci_memp_limit;
+u32 dt_vexpress_pci_io_limit;
+
+u32 pci_convert_base_to_vbase(u32 a) {
+    return (a - dt_vexpress_pci_io_base + dt_vexpress_pci_io_vbase);
+}
+
 static struct map_desc v2m_io_desc[] __initdata = {
 	{
 		.virtual	= V2M_PERIPH,
@@ -281,6 +305,33 @@ static struct amba_device *v2m_amba_devs[] __initdata = {
 	&rtc_device,
 };
 
+static struct map_desc v2m_rs1_io_desc_pci[] __initdata = {
+	{
+	    .virtual    = 0xDEADBEEF,
+	    .pfn        = 0xDEADBEEF,
+	    .length     = 0xDEADBEEF,
+	    .type       = MT_DEVICE
+	},
+	{
+	    .virtual    = 0xDEADBEEF,
+	    .pfn        = 0xDEADBEEF,
+	    .length     = 0xDEADBEEF,
+	    .type       = MT_DEVICE
+	},
+	{
+	    .virtual    = 0xDEADBEEF,
+	    .pfn        = 0xDEADBEEF,
+	    .length     = 0xDEADBEEF,
+	    .type       = MT_DEVICE
+	},
+	{
+	    .virtual    = 0xDEADBEEF,
+	    .pfn        = 0xDEADBEEF,
+	    .length     = 0xDEADBEEF,
+	    .type       = MT_DEVICE
+	},
+};
+
 static void __init v2m_timer_init(void)
 {
 	vexpress_clk_init(ioremap(V2M_SYSCTL, SZ_4K));
@@ -297,7 +348,7 @@ static void __init v2m_init_early(void)
 struct ct_desc *ct_desc;
 
 static struct ct_desc *ct_descs[] __initdata = {
-#ifdef CONFIG_ARCH_VEXPRESS_CA9X4
+#if defined(CONFIG_ARCH_VEXPRESS_CA9X4) || defined(CONFIG_ARCH_VEXPRESS_GEM5)
 	&ct_ca9x4_desc,
 #endif
 };
@@ -415,15 +466,207 @@ static int __init v2m_dt_scan_memory_map(unsigned long node, const char *uname,
 	return 1;
 }
 
+static int __init v2m_dt_scan_pcie_gem5_ranges(unsigned long node, const char *uname,
+		int depth, void *data)
+{
+	const u32 **ranges = data;
+
+	if (strncmp(uname, "gem5_pcie@", 10) != 0)
+		return 0;
+
+	*ranges = of_get_flat_dt_prop(node, "ranges", NULL);
+	return 1;
+}
+
+static int __init v2m_dt_scan_pcie_gem5_reg(unsigned long node, const char *uname,
+		int depth, void *data)
+{
+	const u32 **reg = data;
+
+	if (strncmp(uname, "gem5_pcie@", 10) != 0)
+		return 0;
+
+	*reg = of_get_flat_dt_prop(node, "reg", NULL);
+	return 1;
+}
+
+static int __init v2m_dt_scan_pcie_gem5_virtual_reg(unsigned long node, const char *uname,
+		int depth, void *data)
+{
+	const u32 **reg = data;
+
+	if (strncmp(uname, "gem5_pcie@", 10) != 0)
+		return 0;
+
+	*reg = of_get_flat_dt_prop(node, "virtual-reg", NULL);
+	return 1;
+}
+
+static int __init v2m_dt_scan_pcie_gem5_addr_cells(unsigned long node, const char *uname,
+		int depth, void *data)
+{
+	const u32 **addr_cells = data;
+
+	if (strncmp(uname, "gem5_pcie@", 10) != 0)
+		return 0;
+
+	*addr_cells = of_get_flat_dt_prop(node, "#address-cells", NULL);
+	return 1;
+}
+
+static int __init v2m_dt_scan_pcie_gem5_size_cells(unsigned long node, const char *uname,
+		int depth, void *data)
+{
+	const u32 **size_cells = data;
+
+	if (strncmp(uname, "gem5_pcie@", 10) != 0)
+		return 0;
+
+	*size_cells = of_get_flat_dt_prop(node, "#size-cells", NULL);
+	return 1;
+}
+
+static int __init v2m_dt_scan_motherboard_addr_cells(unsigned long node, const char *uname,
+		int depth, void *data)
+{
+	const u32 **addr_cells = data;
+
+	if (strcmp(uname, "motherboard") != 0)
+		return 0;
+
+	*addr_cells = of_get_flat_dt_prop(node, "#address-cells", NULL);
+	return 1;
+}
+
+static void __init v2m_dt_pci_init(void)
+{
+	const __be32 *ranges = NULL;
+	const __be32 *reg = NULL;
+	const __be32 *virtual_reg = NULL;
+	const __be32 *addr_cells  = NULL;
+	const __be32 *size_cells  = NULL;
+	const __be32 *m_addr_cells  = NULL;
+
+	/* variables to identify io and mem spaces */
+	int i;
+	int n_addr_cells, n_size_cells, m_n_addr_cells, range_set_w;
+	u32 phys_hi, phys_addr, addr_space_size;
+
+	/* Scan Flat device tree for pcie node and extract the necessary parameters */
+	printk("kdebugv2m: Following are test values to confirm proper working\n");
+	of_scan_flat_dt(v2m_dt_scan_pcie_gem5_ranges, &ranges);
+
+	if (ranges == NULL) {
+		pr_info("No gem5 PCI found in DT.\n");
+		return;
+	}
+
+	printk("kdebugv2m: Ranges %x %x \n",
+		be32_to_cpup(&ranges[0]), be32_to_cpup(&ranges[1]) );
+
+	of_scan_flat_dt(v2m_dt_scan_pcie_gem5_reg, &reg);
+	printk("kdebugv2m: Regs %x %x \n", be32_to_cpup(&reg[1]),
+		be32_to_cpup(&reg[2]) );
+
+	of_scan_flat_dt(v2m_dt_scan_pcie_gem5_virtual_reg, &virtual_reg);
+	printk("kdebugv2m: Virtual-Reg %x \n", be32_to_cpup(&virtual_reg[0]));
+
+	of_scan_flat_dt(v2m_dt_scan_pcie_gem5_addr_cells, &addr_cells);
+	printk("kdebugv2m: pci node addr_cells %x \n",
+		be32_to_cpup(&addr_cells[0]));
+
+	of_scan_flat_dt(v2m_dt_scan_pcie_gem5_size_cells, &size_cells);
+	printk("kdebugv2m: pci node size_cells %x \n",
+		be32_to_cpup(&size_cells[0]));
+
+	of_scan_flat_dt(v2m_dt_scan_motherboard_addr_cells, &m_addr_cells);
+	printk("kdebugv2m: motherboard addr_cells %x \n",
+		be32_to_cpup(&m_addr_cells[0]));
+
+	n_addr_cells = be32_to_cpup(addr_cells);
+	n_size_cells = be32_to_cpup(size_cells);
+	m_n_addr_cells = be32_to_cpup(m_addr_cells);
+	range_set_w = n_addr_cells + m_n_addr_cells + n_size_cells;
+
+	/* Assign values to the extern variables */
+	dt_vexpress_pci_cfg_base  = be32_to_cpup(&reg[1]);
+	dt_vexpress_pci_cfg_size  = be32_to_cpup(&reg[2]);
+	dt_vexpress_pci_cfg_vbase = be32_to_cpup(&virtual_reg[0]);
+
+	/* interating to get range parameters from Flat DTB */
+	for(i=0; i<3; i++) {
+		phys_hi = be32_to_cpup(&ranges[i*range_set_w]);
+		phys_addr = be32_to_cpup(&ranges[i*range_set_w + n_addr_cells - 1]);
+		addr_space_size = be32_to_cpup(&ranges[i*range_set_w + range_set_w - 1]);
+		switch( (phys_hi >> SPACE_CODE_BIT_LOCN) & SPACE_CODE_WIDTH) {
+		case 1: /* IO Space */
+			dt_vexpress_pci_io_base = phys_addr;
+			dt_vexpress_pci_io_size = addr_space_size;
+			break;
+		case 2: /* Mem Space */
+                	if( (phys_hi >> 30) & 0x1) { /* Prefetchable mem */
+				dt_vexpress_pci_memp_base = phys_addr;
+				dt_vexpress_pci_memp_size = addr_space_size;
+			} else { /* non-prefetchable mem */
+				dt_vexpress_pci_mem_base = phys_addr;
+				dt_vexpress_pci_mem_size = addr_space_size;
+			}
+			break;
+		}
+	}
+
+	dt_vexpress_pci_mem_vbase = dt_vexpress_pci_cfg_vbase +
+		dt_vexpress_pci_cfg_size;
+	dt_vexpress_pci_memp_vbase = dt_vexpress_pci_mem_vbase +
+		dt_vexpress_pci_mem_size;
+	dt_vexpress_pci_io_vbase = dt_vexpress_pci_memp_vbase +
+		dt_vexpress_pci_memp_size;
+	dt_vexpress_pci_cfg_limit  = (dt_vexpress_pci_cfg_size +
+		dt_vexpress_pci_cfg_base -1);
+	dt_vexpress_pci_mem_limit  = (dt_vexpress_pci_mem_base +
+		dt_vexpress_pci_mem_size - 1);
+	dt_vexpress_pci_memp_limit = (dt_vexpress_pci_memp_base +
+		dt_vexpress_pci_memp_size - 1);
+	dt_vexpress_pci_io_limit   = (dt_vexpress_pci_io_base +
+		dt_vexpress_pci_io_size - 1);
+
+	/* Update the map_desc structure */
+	// CFG
+	v2m_rs1_io_desc_pci[0].virtual    = dt_vexpress_pci_cfg_vbase;
+	v2m_rs1_io_desc_pci[0].pfn        = __phys_to_pfn(dt_vexpress_pci_cfg_base);
+	v2m_rs1_io_desc_pci[0].length     = dt_vexpress_pci_cfg_size;
+
+	// MEMP
+	v2m_rs1_io_desc_pci[1].virtual    = dt_vexpress_pci_memp_vbase;
+	v2m_rs1_io_desc_pci[1].pfn        = __phys_to_pfn(dt_vexpress_pci_memp_base);
+	v2m_rs1_io_desc_pci[1].length     = dt_vexpress_pci_memp_size;
+
+	// MEM
+	v2m_rs1_io_desc_pci[2].virtual    = dt_vexpress_pci_mem_vbase;
+	v2m_rs1_io_desc_pci[2].pfn        = __phys_to_pfn(dt_vexpress_pci_mem_base);
+	v2m_rs1_io_desc_pci[2].length     = dt_vexpress_pci_mem_size;
+
+	// IO
+	v2m_rs1_io_desc_pci[3].virtual    = dt_vexpress_pci_io_vbase;
+	v2m_rs1_io_desc_pci[3].pfn        = __phys_to_pfn(dt_vexpress_pci_io_base);
+	v2m_rs1_io_desc_pci[3].length     = dt_vexpress_pci_io_size;
+
+	/* Initialize the updated mapping */
+	iotable_init(v2m_rs1_io_desc_pci, ARRAY_SIZE(v2m_rs1_io_desc_pci));
+}
+
 void __init v2m_dt_map_io(void)
 {
 	const char *map = NULL;
 
 	of_scan_flat_dt(v2m_dt_scan_memory_map, &map);
 
-	if (map && strcmp(map, "rs1") == 0)
+	if (map && strcmp(map, "rs1") == 0) {
 		iotable_init(&v2m_rs1_io_desc, 1);
-	else
+#ifdef CONFIG_PCI
+		v2m_dt_pci_init();
+#endif
+	} else
 		iotable_init(v2m_io_desc, ARRAY_SIZE(v2m_io_desc));
 
 #if defined(CONFIG_SMP)
