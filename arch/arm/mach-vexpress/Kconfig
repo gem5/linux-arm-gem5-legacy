@@ -15,7 +15,6 @@ config ARCH_VEXPRESS
 	select HAVE_SMP
 	select ICST
 	select MIGHT_HAVE_CACHE_L2X0
-	select NO_IOPORT
 	select PLAT_VERSATILE
 	select PLAT_VERSATILE_CLCD
 	select POWER_RESET
@@ -34,6 +33,7 @@ config ARCH_VEXPRESS
 	  - LogicTile Express 13MG (V2F-2XV6) with A5, A7, A9 or A15 SMMs
 	    (Soft Macrocell Models)
 	  - Versatile Express RTSMs (Models)
+	  - Versatile Express gem5 (Model)
 
 	  You must boot using a Flattened Device Tree in order to use these
 	  platforms. The traditional (ATAGs) boot method is not usable on
@@ -41,6 +41,24 @@ config ARCH_VEXPRESS
 
 menu "Versatile Express platform type"
 	depends on ARCH_VEXPRESS
+
+choice
+        prompt "Platform variant"
+        default ARCH_VEXPRESS_CA9x4
+        config ARCH_VEXPRESS_CA9X4
+                bool "Versatile Express Cortex-A9x4 tile"
+                select NO_IOPORT
+
+        config ARCH_VEXPRESS_GEM5
+                bool "Versatile Express gem5 model"
+                select MIGHT_HAVE_PCI
+                select PCI
+                select NEED_MACH_IO_H
+                select NEED_MACH_MEMORY_H
+                help
+                  Enables gem5-specific workarounds / enhancements to the base
+                  Versatile Express platform.
+endchoice
 
 config ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA
 	bool "Enable A5 and A9 only errata work-arounds"
@@ -52,10 +70,6 @@ config ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA
 	  based on Cortex-A5 and Cortex-A9 processors. In order to
 	  build a working kernel, you must also enable relevant core
 	  tile support or Flattened Device Tree based support options.
-
-config ARCH_VEXPRESS_CA9X4
-	bool "Versatile Express Cortex-A9x4 tile"
-	select ARM_ERRATA_643719
 
 config ARCH_VEXPRESS_DCSCB
 	bool "Dual Cluster System Control Block (DCSCB) support"

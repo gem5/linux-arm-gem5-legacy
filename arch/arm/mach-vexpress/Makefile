@@ -1,11 +1,19 @@
 #
 # Makefile for the linux kernel.
 #
+
+ifeq ($(CONFIG_ARCH_VEXPRESS_GEM5),y)
+ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
+	-I$(srctree)/arch/arm/plat-versatile/include \
+	-I$(srctree)/arch/arm/mach-vexpress/include
+else
 ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
 	-I$(srctree)/arch/arm/plat-versatile/include
+endif
 
 obj-y					:= v2m.o
 obj-$(CONFIG_ARCH_VEXPRESS_CA9X4)	+= ct-ca9x4.o
+obj-$(CONFIG_ARCH_VEXPRESS_GEM5)	+= ct-ca9x4.o
 obj-$(CONFIG_ARCH_VEXPRESS_DCSCB)	+= dcscb.o	dcscb_setup.o
 CFLAGS_dcscb.o				+= -march=armv7-a
 CFLAGS_REMOVE_dcscb.o			= -pg
@@ -20,3 +28,4 @@ CFLAGS_REMOVE_tc2_pm_psci.o		= -pg
 endif
 obj-$(CONFIG_SMP)			+= platsmp.o
 obj-$(CONFIG_HOTPLUG_CPU)		+= hotplug.o
+obj-$(CONFIG_PCI)			+= pcie_gem5.o
