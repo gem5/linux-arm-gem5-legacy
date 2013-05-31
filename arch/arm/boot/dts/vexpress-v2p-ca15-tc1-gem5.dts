@@ -62,6 +62,7 @@
 		clocks = <&oscclk5>;
 		clock-names = "pxlclk";
 		mode = "1024x768-16@60";
+//		mode = "3840x2160M-16@60m";	// 4K mode string
 		framebuffer = <0 0xbf000000 0 0x01000000>;
 	};
 /*
@@ -167,7 +168,9 @@
 			/* HDLCD PLL reference clock */
 			compatible = "arm,vexpress-osc";
 			arm,vexpress-sysreg,func = <1 5>;
-			freq-range = <23750000 165000000>;
+//			freq-range = <23750000 165000000>;	// original
+			freq-range = <23750000 1000000000>;	// for gem5 extended
+								// resolution support
 			#clock-cells = <0>;
 			clock-output-names = "oscclk5";
 		};

@@ -30,6 +30,7 @@ static struct {
 	{ 1280, 1024, 3 }, /* SXGA */
 	{ 1600, 1200, 4 }, /* UXGA */
 	{ 1920, 1080, 5 }, /* HD1080 */
+	{ 3840, 2160, 6 }, /* 4K - gem5 only */
 };
 
 static void vexpress_dvi_mode_set(struct fb_info *info, u32 xres, u32 yres)
