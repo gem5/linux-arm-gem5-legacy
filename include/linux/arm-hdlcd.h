@@ -81,8 +81,14 @@
 /* Max resolution supported is 4096x4096, 8 bit per color component,
    8 bit alpha, but we are going to choose the usual hardware default
    (2048x2048, 32 bpp) and enable double buffering */
-#define HDLCD_MAX_XRES			2048
-#define HDLCD_MAX_YRES			2048
+//#define HDLCD_MAX_XRES			2048
+//#define HDLCD_MAX_YRES			2048
+
+/* For gem5, we want to support up to 8K, so these values adjusted accordingly.
+   Since our HW is just a model, it can support whatever we like. */
+#define HDLCD_MAX_XRES			8192
+#define HDLCD_MAX_YRES			8192
+
 #define HDLCD_MAX_FRAMEBUFFER_SIZE	(HDLCD_MAX_XRES * HDLCD_MAX_YRES << 2)
 
 #define HDLCD_MEM_BASE			(CONFIG_PAGE_OFFSET - 0x1000000)
