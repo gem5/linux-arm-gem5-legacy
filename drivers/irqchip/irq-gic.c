@@ -68,6 +68,7 @@ struct gic_chip_data {
 #ifdef CONFIG_GIC_NON_BANKED
 	void __iomem *(*get_base)(union gic_base *);
 #endif
+	bool gic_extended;
 };
 
 static DEFINE_RAW_SPINLOCK(irq_controller_lock);
@@ -77,7 +78,7 @@ static DEFINE_RAW_SPINLOCK(irq_controller_lock);
  * the logical CPU numbering.  Let's use a mapping as returned
  * by the GIC itself.
  */
-#define NR_GIC_CPU_IF 8
+#define NR_GIC_CPU_IF 256
 static u8 gic_cpu_map[NR_GIC_CPU_IF] __read_mostly;
 
 /*
@@ -255,6 +256,7 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
 
 	raw_spin_lock(&irq_controller_lock);
 	mask = 0xff << shift;
+	/* When gic_extended, this isn't a bit, it's a value-- but also 8-bits so Just Works */
 	bit = gic_cpu_map[cpu] << shift;
 	val = readl_relaxed(reg) & ~mask;
 	writel_relaxed(val | bit, reg);
@@ -359,16 +361,23 @@ static u8 gic_get_cpumask(struct gic_chip_data *gic)
 	void __iomem *base = gic_data_dist_base(gic);
 	u32 mask, i;
 
-	for (i = mask = 0; i < 32; i += 4) {
-		mask = readl_relaxed(base + GIC_DIST_TARGET + i);
-		mask |= mask >> 16;
-		mask |= mask >> 8;
-		if (mask)
-			break;
-	}
+	if (!gic->gic_extended) {
+		for (i = mask = 0; i < 32; i += 4) {
+			mask = readl_relaxed(base + GIC_DIST_TARGET + i);
+			mask |= mask >> 16;
+			mask |= mask >> 8;
+			if (mask)
+				break;
+		}
 
-	if (!mask)
-		pr_crit("GIC CPU mask not found - kernel will fail to boot.\n");
+		if (!mask)
+			pr_crit("GIC CPU mask not found - kernel will fail to boot.\n");
+	} else {
+		/* This isn't a mask, it's an actual CPU number.  It always
+		 * exists in TARGETR0.
+		 */
+		mask = readl_relaxed(base + GIC_DIST_TARGET);
+	}
 
 	return mask;
 }
@@ -431,9 +440,11 @@ static void gic_cpu_init(struct gic_chip_data *gic)
 	 * Clear our mask from the other map entries in case they're
 	 * still undefined.
 	 */
-	for (i = 0; i < NR_GIC_CPU_IF; i++)
-		if (i != cpu)
-			gic_cpu_map[i] &= ~cpu_mask;
+	if (!gic->gic_extended) {
+		for (i = 0; i < NR_GIC_CPU_IF; i++)
+			if (i != cpu)
+				gic_cpu_map[i] &= ~cpu_mask;
+	}
 
 	/*
 	 * Deal with the banked PPI and SGI interrupts - disable all
@@ -652,21 +663,31 @@ void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
 {
 	int cpu;
 	unsigned long flags, map = 0;
+        struct gic_chip_data *gic = &gic_data[0];
 
 	raw_spin_lock_irqsave(&irq_controller_lock, flags);
 
-	/* Convert our logical CPU mask into a physical one. */
-	for_each_cpu(cpu, mask)
-		map |= gic_cpu_map[cpu];
-
-	/*
-	 * Ensure that stores to Normal memory are visible to the
-	 * other CPUs before issuing the IPI.
-	 */
-	dsb();
-
-	/* this always happens on GIC0 */
-	writel_relaxed(map << 16 | irq, gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
+        if (gic->gic_extended) {
+                /* We can only send one IPI at once, so have to loop in here. */
+                dsb();
+                for_each_cpu(cpu, mask) {
+                        int dest = gic_cpu_map[cpu];
+                        writel_relaxed(dest << 16 | irq, gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
+                }
+        } else {
+                /* Convert our logical CPU mask into a physical one. */
+                for_each_cpu(cpu, mask)
+                        map |= gic_cpu_map[cpu];
+ 
+                /*
+                 * Ensure that stores to Normal memory are visible to the
+                 * other CPUs before issuing the IPI.
+                 */
+                dsb();
+ 
+                /* this always happens on GIC0 */
+                writel_relaxed(map << 16 | irq, gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
+        }
 
 	raw_spin_unlock_irqrestore(&irq_controller_lock, flags);
 }
@@ -881,6 +902,7 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
 	irq_hw_number_t hwirq_base;
 	struct gic_chip_data *gic;
 	int gic_irqs, irq_base, i;
+	int val;
 
 	BUG_ON(gic_nr >= MAX_GIC_NR);
 
@@ -915,6 +937,16 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
 		gic->cpu_base.common_base = cpu_base;
 		gic_set_base_accessor(gic, gic_get_common_base);
 	}
+
+	/* ME: Is this an extended GIC/eGIC? */
+	if (of_find_property(node, "enable-egic", &val) && val != 0) {
+		gic->gic_extended = !!(readl_relaxed(gic_data_dist_base(gic) + GIC_DIST_CTR) & 0x100);
+	} else {
+		gic->gic_extended = false;
+	}
+
+	if (gic->gic_extended)
+		pr_info("GIC: Detected eGIC\n");
 
 	/*
 	 * Initialize the CPU interface map to all CPUs.
