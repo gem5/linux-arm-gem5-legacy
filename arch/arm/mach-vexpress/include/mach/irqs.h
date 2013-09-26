@@ -2,5 +2,5 @@
 #define IRQ_LOCALWDOG		30
 
 #ifndef CONFIG_SPARSE_IRQ
-#define NR_IRQS	256
+#define NR_IRQS	512
 #endif
