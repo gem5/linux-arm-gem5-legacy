@@ -53,6 +53,8 @@ choice
                 bool "Versatile Express gem5 model"
                 select MIGHT_HAVE_PCI
                 select PCI
+                select ARM_GIC_MSI
+                select ARCH_SUPPORTS_MSI
                 select NEED_MACH_IO_H
                 select NEED_MACH_MEMORY_H
                 help
