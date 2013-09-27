@@ -24,6 +24,8 @@
 static int hdmiphy_probe(struct i2c_client *client,
 	const struct i2c_device_id *id)
 {
+	printk("trb: %s() called\n", __func__);
+
 	hdmi_attach_hdmiphy_client(client);
 
 	dev_info(&client->adapter->dev, "attached s5p_hdmiphy "
