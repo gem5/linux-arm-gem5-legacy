@@ -127,14 +127,25 @@
 	};
 */
 
+
+	timer {
+		compatible = "arm,cortex-a15-timer",
+			     "arm,armv7-timer";
+		interrupts = <1 13 0xff01>,
+		             <1 14 0xff01>;
+        clocks = <&oscclk7>;
+        clock-names="apb_pclk";
+	};
+
+
 	/** HACK : cortex-a9-twd-timer hack -- temporary fix */
-	timer@2c080000 {
+	/*timer@2c080000 {
 		compatible = "arm,cortex-a9-twd-timer";
 		reg = <0 0x2c080000 0 0x20>;
 		interrupts = <1 13 0xf04>;
 		clocks = <&oscclk7>;
 		clock-names = "apb_pclk";
-	};
+	};*/
 
 	pmu {
 		compatible = "arm,cortex-a15-pmu";
