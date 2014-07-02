@@ -24,6 +24,10 @@
 #include <mach/memory.h>
 #endif
 
+#ifndef arch_is_coherent
+#define arch_is_coherent() 0
+#endif
+
 /*
  * Allow for constants defined here to be used from assembly code
  * by prepending the UL suffix only with actual C code compilation.

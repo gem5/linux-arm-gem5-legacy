@@ -22,6 +22,8 @@ static inline struct dma_map_ops *__generic_dma_ops(struct device *dev)
 {
 	if (dev && dev->archdata.dma_ops)
 		return dev->archdata.dma_ops;
+	if (arch_is_coherent())
+		return &arm_coherent_dma_ops;
 	return &arm_dma_ops;
 }
 
