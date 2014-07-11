@@ -93,6 +93,16 @@ config ARCH_VEXPRESS_SPC
 	  between the dual cluster test-chip and the M3 microcontroller that
 	  carries out power management.
 
+config ARCH_GEM5_ENERGY_CTRL
+	bool "Gem5 Energy Controller"
+	depends on ARM
+	depends on !ARCH_VEXPRESS_SPC
+	select ARCH_HAS_CPUFREQ
+	select ARCH_HAS_OPP
+	select PM_OPP
+	help
+	  Select options avaiable for the gem5 energy controller related configs
+
 config ARCH_VEXPRESS_TC2_PM
 	bool "Versatile Express TC2 power management"
 	depends on MCPM
