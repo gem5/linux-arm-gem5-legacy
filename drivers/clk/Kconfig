@@ -114,6 +114,12 @@ config COMMON_CLK_KEYSTONE
           Supports clock drivers for Keystone based SOCs. These SOCs have local
 	  a power sleep control module that gate the clock to the IPs and PLLs.
 
+config GEM5_CPUFREQ_CLK
+	bool "Clk driver for GEM5 Platform"
+	---help---
+	  Enable clk hardware for cpufreq in gem5 platforms
+
+
 source "drivers/clk/qcom/Kconfig"
 
 endmenu

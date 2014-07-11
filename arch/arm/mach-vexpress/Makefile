@@ -29,3 +29,4 @@ endif
 obj-$(CONFIG_SMP)			+= platsmp.o
 obj-$(CONFIG_HOTPLUG_CPU)		+= hotplug.o
 obj-$(CONFIG_PCI)			+= pcie_gem5.o
+obj-$(CONFIG_ARCH_GEM5_ENERGY_CTRL)		+= gem5-energy-ctrl.o
