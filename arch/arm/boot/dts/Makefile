@@ -282,7 +282,14 @@ dtb-$(CONFIG_ARCH_U300) += ste-u300.dtb
 dtb-$(CONFIG_ARCH_VEXPRESS) += vexpress-v2p-ca5s.dtb \
 	vexpress-v2p-ca9.dtb \
 	vexpress-v2p-ca15-tc1.dtb \
-        vexpress-v2p-ca15-tc1-gem5.dtb \
+	vexpress-v2p-ca15-tc1-gem5.dtb \
+	vexpress-v2p-ca15-tc1-gem5_2cpus.dtb \
+	vexpress-v2p-ca15-tc1-gem5_4cpus.dtb \
+	vexpress-v2p-ca15-tc1-gem5_dvfs_1cpus.dtb \
+	vexpress-v2p-ca15-tc1-gem5_dvfs_2cpus.dtb \
+	vexpress-v2p-ca15-tc1-gem5_dvfs_4cpus.dtb \
+	vexpress-v2p-ca15-tc1-gem5_dvfs_per_core_2cpus.dtb \
+	vexpress-v2p-ca15-tc1-gem5_dvfs_per_core_4cpus.dtb \
 	vexpress-v2p-ca15_a7.dtb \
 	rtsm_ve-cortex_a9x2.dtb \
 	rtsm_ve-cortex_a9x4.dtb \

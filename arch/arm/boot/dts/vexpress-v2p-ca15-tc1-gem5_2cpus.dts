@@ -41,6 +41,12 @@
 			reg = <0>;
 			clock-frequency = <1000000000>;
 		};
+
+		cpu@1 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a15";
+			reg = <1>;
+		};
 	};
 
 	memory@80000000 {
