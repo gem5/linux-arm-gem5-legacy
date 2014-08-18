@@ -81,6 +81,14 @@ static int gem5_mc_init(void)
 		return -ENOENT;
 	}
 
+        if (!gem5_energy_ctrl_dvfs_enabled()) {
+                pr_info("%s: DVFS handler in energy controller is disabled, \
+                        ARM gem5 multi-cluster cpufreq driver \
+                        will not be registered\n",
+                        __func__);
+                return -ENOENT;
+        }
+
 	return mc_cpufreq_register(&gem5_mc_ops);
 }
 module_init(gem5_mc_init);

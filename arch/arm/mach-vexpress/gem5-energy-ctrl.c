@@ -64,6 +64,12 @@ static bool gem5_energy_ctrl_initialized(void)
 	return gem5_energy_ctrl_load_result == 0;
 }
 
+bool gem5_energy_ctrl_dvfs_enabled(void)
+{
+	return info->dvfs_handler_status;
+}
+EXPORT_SYMBOL_GPL(gem5_energy_ctrl_dvfs_enabled);
+
 static u32 index_of_domain_id(u32 domain_id)
 {
 	u32 i;
@@ -157,6 +163,8 @@ int gem5_energy_ctrl_set_performance(u32 domain_id, u32 freq)
 	int ret, perf;
 	u32 domain_index;
 
+        ret = 0;
+
 	if (!gem5_energy_ctrl_initialized() || !info->dvfs_handler_status)
 		return -EINVAL;
 
@@ -246,8 +254,8 @@ int gem5_energy_ctrl_get_opp_table(u32 domain_id, u32 **fptr, u32 **vptr)
 {
 	u32 domain_index;
 
-	if (!gem5_energy_ctrl_initialized() ||
-		WARN_ON_ONCE(!fptr || !info->dvfs_handler_status))
+	if (!gem5_energy_ctrl_initialized() || !fptr || !vptr || !info ||
+            !info->dvfs_handler_status)
 		return -EINVAL;
 
 	domain_index = index_of_domain_id(domain_id);

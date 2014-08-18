@@ -44,11 +44,6 @@
 				core0: core@0 {
 					reg = <0>;
 				};
-/*
-				core1: core@1 {
-					reg = <1>;
-				};
-*/
 			};
 		};
         };
@@ -65,15 +60,6 @@
 			core = <&core0>;
 			clock-frequency = <1000000000>;
 		};
-
-/*		cpu@1 {
-			device_type = "cpu";
-			compatible = "arm,cortex-a15";
-			cluster = <&cluster0>;
-			core = <&core1>;
-			reg = <1>;
-		};
-*/
 	};
 
 	memory@80000000 {
@@ -87,8 +73,9 @@
 		interrupts = <0 85 4>;
 		clocks = <&oscclk5>;
 		clock-names = "pxlclk";
-		mode = "1024x768-16@60";
-//		mode = "3840x2160M-16@60m";	// 4K mode string
+//		mode = "1024x768MR-16@60";
+		mode = "1920x1080MR-16@60";	// HD mode string
+//		mode = "3840x2160MR-16@60";	// UHD4K mode string
 		framebuffer = <0 0x8f000000 0 0x01000000>;
 	};
 /*
@@ -181,7 +168,7 @@
 
 	gem5_energy_ctrl@1c080000 {
 		compatible = "arm,gem5-energy-ctrl";
-		reg = <0 0x1c080000 0 0x1C>;
+		reg = <0 0x1c080000 0 0x1000>;
 	};
 
 	dcc {

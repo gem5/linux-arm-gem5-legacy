@@ -19,6 +19,7 @@
 /* Energy Controller */
 
 extern bool gem5_energy_ctrl_check_loaded(void);
+extern bool gem5_energy_ctrl_dvfs_enabled(void);
 extern u32 gem5_energy_ctrl_get_trans_latency(void);
 extern int gem5_energy_ctrl_get_opp_table(u32, u32 **, u32 **);
 extern int gem5_energy_ctrl_get_performance(u32, u32 *);
