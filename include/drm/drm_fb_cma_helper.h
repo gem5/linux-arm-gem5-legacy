@@ -27,5 +27,7 @@ struct drm_gem_cma_object *drm_fb_cma_get_gem_obj(struct drm_framebuffer *fb,
 int drm_fb_cma_debugfs_show(struct seq_file *m, void *arg);
 #endif
 
+struct dma_buf *drm_fb_cma_get_dmabuf(struct fb_info *info);
+
 #endif
 

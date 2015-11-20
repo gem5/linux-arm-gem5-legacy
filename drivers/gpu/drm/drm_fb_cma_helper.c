@@ -220,16 +220,33 @@ int drm_fb_cma_debugfs_show(struct seq_file *m, void *arg)
 EXPORT_SYMBOL_GPL(drm_fb_cma_debugfs_show);
 #endif
 
+
+struct dma_buf *drm_fb_cma_get_dmabuf(struct fb_info *info)
+{
+	struct drm_fb_helper *helper = info->par;
+	struct drm_device *dev = helper->dev;
+	struct drm_gem_cma_object *cma_obj;
+
+	if (dev->driver->gem_prime_export) {
+		cma_obj = drm_fb_cma_get_gem_obj(helper->fb, 0);
+		return dev->driver->gem_prime_export(dev, &cma_obj->base,
+						     O_RDWR);
+	} else
+		return NULL;
+}
+EXPORT_SYMBOL_GPL(drm_fb_cma_get_dmabuf);
+
 static struct fb_ops drm_fbdev_cma_ops = {
-	.owner		= THIS_MODULE,
-	.fb_fillrect	= drm_fb_helper_sys_fillrect,
-	.fb_copyarea	= drm_fb_helper_sys_copyarea,
-	.fb_imageblit	= drm_fb_helper_sys_imageblit,
-	.fb_check_var	= drm_fb_helper_check_var,
-	.fb_set_par	= drm_fb_helper_set_par,
-	.fb_blank	= drm_fb_helper_blank,
-	.fb_pan_display	= drm_fb_helper_pan_display,
-	.fb_setcmap	= drm_fb_helper_setcmap,
+	.owner			= THIS_MODULE,
+	.fb_fillrect		= drm_fb_helper_sys_fillrect,
+	.fb_copyarea		= drm_fb_helper_sys_copyarea,
+	.fb_imageblit		= drm_fb_helper_sys_imageblit,
+	.fb_check_var		= drm_fb_helper_check_var,
+	.fb_set_par		= drm_fb_helper_set_par,
+	.fb_blank		= drm_fb_helper_blank,
+	.fb_pan_display		= drm_fb_helper_pan_display,
+	.fb_setcmap		= drm_fb_helper_setcmap,
+	.fb_dmabuf_export	= drm_fb_cma_get_dmabuf,
 };
 
 static int drm_fbdev_cma_create(struct drm_fb_helper *helper,
