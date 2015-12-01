@@ -85,6 +85,7 @@ struct gic_chip_data {
 #ifdef CONFIG_GIC_NON_BANKED
 	void __iomem *(*get_base)(union gic_base *);
 #endif
+       bool gem5_extensions;
 };
 
 static DEFINE_RAW_SPINLOCK(irq_controller_lock);
@@ -93,8 +94,12 @@ static DEFINE_RAW_SPINLOCK(irq_controller_lock);
  * The GIC mapping of CPU interfaces does not necessarily match
  * the logical CPU numbering.  Let's use a mapping as returned
  * by the GIC itself.
+ *
+ * The CPU map normally contains a bitmask that maps interrupts to
+ * CPUs. When gem5 extensions have been enabled, it represents an 8
+ * bit CPU ID instead.
  */
-#define NR_GIC_CPU_IF 8
+#define NR_GIC_CPU_IF 256
 static u8 gic_cpu_map[NR_GIC_CPU_IF] __read_mostly;
 
 static struct static_key supports_deactivate = STATIC_KEY_INIT_TRUE;
@@ -428,16 +433,24 @@ static u8 gic_get_cpumask(struct gic_chip_data *gic)
 	void __iomem *base = gic_data_dist_base(gic);
 	u32 mask, i;
 
-	for (i = mask = 0; i < 32; i += 4) {
-		mask = readl_relaxed(base + GIC_DIST_TARGET + i);
-		mask |= mask >> 16;
-		mask |= mask >> 8;
-		if (mask)
-			break;
-	}
+	if (!gic->gem5_extensions) {
+		for (i = mask = 0; i < 32; i += 4) {
+			mask = readl_relaxed(base + GIC_DIST_TARGET + i);
+			mask |= mask >> 16;
+			mask |= mask >> 8;
+			if (mask)
+				break;
+		}
 
-	if (!mask && num_possible_cpus() > 1)
-		pr_crit("GIC CPU mask not found - kernel will fail to boot.\n");
+		if (!mask && num_possible_cpus() > 1)
+			pr_crit("GIC CPU mask not found - kernel will fail "
+				"to boot.\n");
+	} else {
+		/* This isn't a mask, it's an actual CPU number.  It always
+		 * exists in TARGETR0.
+		 */
+		mask = readl_relaxed(base + GIC_DIST_TARGET);
+	}
 
 	return mask;
 }
@@ -508,9 +521,11 @@ static void gic_cpu_init(struct gic_chip_data *gic)
 		 * Clear our mask from the other map entries in case they're
 		 * still undefined.
 		 */
-		for (i = 0; i < NR_GIC_CPU_IF; i++)
-			if (i != cpu)
-				gic_cpu_map[i] &= ~cpu_mask;
+		if (!gic->gem5_extensions) {
+			for (i = 0; i < NR_GIC_CPU_IF; i++)
+				if (i != cpu)
+					gic_cpu_map[i] &= ~cpu_mask;
+		}
 	}
 
 	gic_cpu_config(dist_base, NULL);
@@ -758,26 +773,54 @@ static void __init gic_pm_init(struct gic_chip_data *gic)
 #endif
 
 #ifdef CONFIG_SMP
+static int gic_cpu_map_initialized(const struct cpumask *mask)
+{
+	int cpu;
+	for_each_cpu(cpu, mask) {
+		if (gic_cpu_map[cpu] == 0xff)
+			return 0;
+	}
+	return 1;
+}
+
 static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
 {
 	int cpu;
 	unsigned long flags, map = 0;
+	void __iomem *base = gic_data_dist_base(&gic_data[0]);
 
 	raw_spin_lock_irqsave(&irq_controller_lock, flags);
+	if (gic_data[0].gem5_extensions) {
+		dmb(ishst);
+		if (!gic_cpu_map_initialized(mask)) {
+			/* We don't know the CPU mapping yet, so send
+			 * a broadcast */
+			writel_relaxed(0x1 << 24 | irq,
+				       base + GIC_DIST_SOFTINT);
+		} else {
+			/* We can only send one IPI at once, so have
+			 * to loop in here. */
+			for_each_cpu(cpu, mask) {
+				int dest = gic_cpu_map[cpu];
+				writel_relaxed(dest << 16 | irq,
+					       base + GIC_DIST_SOFTINT);
+			}
+		}
+		dmb(ishst);
+	} else {
+		/* Convert our logical CPU mask into a physical one. */
+		for_each_cpu(cpu, mask) {
+			map |= gic_cpu_map[cpu];
+		}
+		/*
+		* Ensure that stores to Normal memory are visible to the
+		* other CPUs before they observe us issuing the IPI.
+		*/
+		dmb(ishst);
 
-	/* Convert our logical CPU mask into a physical one. */
-	for_each_cpu(cpu, mask)
-		map |= gic_cpu_map[cpu];
-
-	/*
-	 * Ensure that stores to Normal memory are visible to the
-	 * other CPUs before they observe us issuing the IPI.
-	 */
-	dmb(ishst);
-
-	/* this always happens on GIC0 */
-	writel_relaxed(map << 16 | irq, gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
-
+		/* this always happens on GIC0 */
+		writel_relaxed(map << 16 | irq, base + GIC_DIST_SOFTINT);
+	}
 	raw_spin_unlock_irqrestore(&irq_controller_lock, flags);
 }
 #endif
@@ -1078,6 +1121,8 @@ static void __init __gic_init_bases(unsigned int gic_nr, int irq_start,
 		gic_set_base_accessor(gic, gic_get_common_base);
 	}
 
+	gic->gem5_extensions = false;
+
 	/*
 	 * Find out how many interrupts are supported.
 	 * The GIC only supports up to 1020 interrupt sources.
@@ -1199,6 +1244,7 @@ static bool gic_check_eoimode(struct device_node *node, void __iomem **base)
 static int __init
 gic_of_init(struct device_node *node, struct device_node *parent)
 {
+	struct gic_chip_data *gic = &gic_data[gic_cnt];
 	void __iomem *cpu_base;
 	void __iomem *dist_base;
 	u32 percpu_offset;
@@ -1236,9 +1282,24 @@ gic_of_init(struct device_node *node, struct device_node *parent)
 	if (IS_ENABLED(CONFIG_ARM_GIC_V2M))
 		gicv2m_of_init(node, gic_data[gic_cnt].domain);
 
+	if (node && of_device_is_compatible(node, "gem5,gic")) {
+#ifndef CONFIG_BL_SWITCHER
+		gic->gem5_extensions = !!(
+			readl_relaxed(dist_base + GIC_DIST_CTR) & 0x100);
+#else
+		WARN(1, "gem5 GIC extensions aren't supported when using the bL switcher.\n");
+#endif
+	}
+
+	if (gic->gem5_extensions) {
+		pr_info("GIC: Detected gem5 extensions\n");
+		writel_relaxed(0x200, gic_data_dist_base(gic) + GIC_DIST_CTR);
+	}
+
 	gic_cnt++;
 	return 0;
 }
+IRQCHIP_DECLARE(gem5_gic, "gem5,gic", gic_of_init);
 IRQCHIP_DECLARE(gic_400, "arm,gic-400", gic_of_init);
 IRQCHIP_DECLARE(arm11mp_gic, "arm,arm11mp-gic", gic_of_init);
 IRQCHIP_DECLARE(arm1176jzf_dc_gic, "arm,arm1176jzf-devchip-gic", gic_of_init);
