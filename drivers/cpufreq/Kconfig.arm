@@ -17,6 +17,27 @@ config ARM_DT_BL_CPUFREQ
 	  This enables probing via DT for Generic CPUfreq driver for ARM
 	  big.LITTLE platform. This gets frequency tables from DT.
 
+config ARM_GEM5_MULTI_CLUSTER_CPUFREQ
+	tristate "Generic ARM Multi-Cluster CPUfreq driver"
+	depends on PM_OPP && HAVE_CLK
+	depends on (ARM_CPU_TOPOLOGY && ARM) || ARM64
+	depends on !ARM_BIG_LITTLE_CPUFREQ
+	depends on ARCH_GEM5_ENERGY_CTRL
+	select CPU_FREQ_TABLE
+	select GEM5_CPUFREQ_CLK
+	help
+	  This enables the Generic CPUfreq driver for ARM gem5 multi-cluster
+	  platforms.
+
+config ARCH_GEM5_ENERGY_CTRL
+	bool "Gem5 Energy Controller"
+	depends on (ARM || ARM64)
+	select ARCH_HAS_CPUFREQ
+	select ARCH_HAS_OPP
+	select PM_OPP
+	help
+	  Select options available for the gem5 energy controller related configs
+
 config ARM_VEXPRESS_SPC_CPUFREQ
         tristate "Versatile Express SPC based CPUfreq driver"
 	depends on ARM_BIG_LITTLE_CPUFREQ && ARCH_VEXPRESS_SPC

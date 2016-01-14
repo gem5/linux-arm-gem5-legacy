@@ -188,6 +188,11 @@ config COMMON_CLK_CDCE706
 	---help---
 	  This driver supports TI CDCE706 programmable 3-PLL clock synthesizer.
 
+config GEM5_CPUFREQ_CLK
+	bool "Clk driver for GEM5 Platform"
+	---help---
+	  Enable clk hardware for cpufreq in gem5 platforms
+
 source "drivers/clk/bcm/Kconfig"
 source "drivers/clk/hisilicon/Kconfig"
 source "drivers/clk/qcom/Kconfig"
