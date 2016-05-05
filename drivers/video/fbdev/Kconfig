@@ -4,6 +4,7 @@
 
 menuconfig FB
 	tristate "Support for frame buffer devices"
+	select DMA_SHARED_BUFFER
 	select FB_CMDLINE
 	---help---
 	  The frame buffer device provides an abstraction for the graphics
