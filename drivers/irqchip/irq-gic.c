@@ -85,6 +85,7 @@ struct gic_chip_data {
 #ifdef CONFIG_GIC_NON_BANKED
 	void __iomem *(*get_base)(union gic_base *);
 #endif
+       bool probe_gem5_extensions;
        bool gem5_extensions;
 };
 
@@ -1122,6 +1123,17 @@ static void __init __gic_init_bases(unsigned int gic_nr, int irq_start,
 	}
 
 	gic->gem5_extensions = false;
+	if (gic->probe_gem5_extensions) {
+#ifndef CONFIG_BL_SWITCHER
+		if (readl_relaxed(dist_base + GIC_DIST_CTR) & 0x100) {
+			pr_info("GIC: Detected gem5 extensions\n");
+			writel_relaxed(0x200, dist_base + GIC_DIST_CTR);
+			gic->gem5_extensions = true;
+		}
+#else
+		WARN(1, "gem5 GIC extensions aren't supported when using the bL switcher.\n");
+#endif
+	}
 
 	/*
 	 * Find out how many interrupts are supported.
@@ -1269,6 +1281,9 @@ gic_of_init(struct device_node *node, struct device_node *parent)
 	if (of_property_read_u32(node, "cpu-offset", &percpu_offset))
 		percpu_offset = 0;
 
+	gic->probe_gem5_extensions =
+		node && of_device_is_compatible(node, "gem5,gic");
+
 	__gic_init_bases(gic_cnt, -1, dist_base, cpu_base, percpu_offset,
 			 &node->fwnode);
 	if (!gic_cnt)
@@ -1281,20 +1296,6 @@ gic_of_init(struct device_node *node, struct device_node *parent)
 
 	if (IS_ENABLED(CONFIG_ARM_GIC_V2M))
 		gicv2m_of_init(node, gic_data[gic_cnt].domain);
-
-	if (node && of_device_is_compatible(node, "gem5,gic")) {
-#ifndef CONFIG_BL_SWITCHER
-		gic->gem5_extensions = !!(
-			readl_relaxed(dist_base + GIC_DIST_CTR) & 0x100);
-#else
-		WARN(1, "gem5 GIC extensions aren't supported when using the bL switcher.\n");
-#endif
-	}
-
-	if (gic->gem5_extensions) {
-		pr_info("GIC: Detected gem5 extensions\n");
-		writel_relaxed(0x200, gic_data_dist_base(gic) + GIC_DIST_CTR);
-	}
 
 	gic_cnt++;
 	return 0;
