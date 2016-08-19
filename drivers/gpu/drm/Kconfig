@@ -219,6 +219,7 @@ config DRM_VGEM
 config DRM_VIRT_ENCODER
 	tristate "Virtual OF-based encoder"
 	depends on DRM && OF
+	select VIDEOMODE_HELPERS
 	help
 	  Choose this option to get a virtual encoder and its associated
 	  connector that will use the device tree to read the display
