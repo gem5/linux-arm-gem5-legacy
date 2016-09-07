@@ -223,16 +223,23 @@ EXPORT_SYMBOL_GPL(drm_fb_cma_debugfs_show);
 
 struct dma_buf *drm_fb_cma_get_dmabuf(struct fb_info *info)
 {
+	struct dma_buf *buf = NULL;
 	struct drm_fb_helper *helper = info->par;
 	struct drm_device *dev = helper->dev;
 	struct drm_gem_cma_object *cma_obj;
 
-	if (dev->driver->gem_prime_export) {
-		cma_obj = drm_fb_cma_get_gem_obj(helper->fb, 0);
-		return dev->driver->gem_prime_export(dev, &cma_obj->base,
-						     O_RDWR);
-	} else
+	if (!dev->driver->gem_prime_export)
 		return NULL;
+
+	cma_obj = drm_fb_cma_get_gem_obj(helper->fb, 0);
+	buf = dev->driver->gem_prime_export(dev, &cma_obj->base,
+					    O_RDWR);
+	if (IS_ERR_OR_NULL(buf))
+		return buf;
+
+	drm_gem_object_reference(&cma_obj->base);
+
+	return buf;
 }
 EXPORT_SYMBOL_GPL(drm_fb_cma_get_dmabuf);
 
